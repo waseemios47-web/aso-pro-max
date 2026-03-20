@@ -156,6 +156,11 @@ cp SKILL.md ~/.claude/skills/aso-pro-max/SKILL.md
 
 ---
 
+## Related Projects / 相关项目
+
+- **[appstore-connect](https://github.com/AfeiFun/appstore-connect)** — A Claude Code skill for managing App Store Connect via API (metadata, screenshots, versions). Pair with this skill for end-to-end automated ASO workflows.
+- **[appstore-connect](https://github.com/AfeiFun/appstore-connect)** — 通过 API 管理 App Store Connect 的 Claude Code 技能（元数据、截图、版本管理）。与本技能搭配使用，实现端到端自动化 ASO 工作流。
+
 ## License
 
 MIT License — see [LICENSE](LICENSE).
