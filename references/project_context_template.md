@@ -12,6 +12,12 @@
 - **Bundle ID**:
 - **类型**: iOS / Android / 跨平台
 - **覆盖 locale**:
+- **brand_name_per_locale**:  ← 关键字段，防 Stage 4 误改品牌名
+  - en-US: "..."
+  - zh-Hans: "..."（如本地化品牌名「微出片」而非英文名）
+  - zh-Hant: "..."
+  - ja: "..."
+  - ...
 
 ## App 真实功能（决定 keyword 选词）
 

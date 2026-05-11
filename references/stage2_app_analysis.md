@@ -1,6 +1,6 @@
 # Stage 2: App 功能自动分析
 
-> 扫 App 代码库自动生成 `{project_root}/.aso/context.md`，是 Stage 3-5 的输入基础。
+> 扫 App 代码库自动生成 `{project_root}/.aso/context.html`，是 Stage 3-5 的输入基础。
 
 ## 触发时机
 
@@ -19,7 +19,16 @@
 
 ### Step 2: 用 Explore Agent 扫描
 
-启动 1 个 Agent (subagent_type=Explore)：
+启动 1 个 Agent (subagent_type=Explore)。**必须在 prompt 中明确禁读历史 ASO 报告**（黄金原则 #7）：
+
+⚠️ **严禁读** `{project_root}/Marketing/ASO_*.md`、`Marketing/WePics_Market_Research_*.md`、`{project_root}/.aso/` 任何文件。否则 Agent 会引用历史结论，污染"从零分析"前提。
+
+如果项目内已有 ASO 历史报告，**在跑 Stage 2 前先把它们移到 `.archive/`**：
+```bash
+mkdir -p {project_root}/Marketing/.archive/
+mv {project_root}/Marketing/ASO_*.md {project_root}/Marketing/.archive/
+mv {project_root}/Marketing/*Market_Research*.md {project_root}/Marketing/.archive/
+```
 
 ```
 prompt 模板：
@@ -36,60 +45,63 @@ prompt 模板：
 输出格式严格按下方模板填写，不要凭空补充信息。不确定的字段标 "?待用户补充"。
 ```
 
-### Step 3: Agent 输出模板
+### Step 3: Agent 输出模板（HTML 格式）
 
-```markdown
-# {App Name} 项目特定上下文
+输出到 `{project_root}/.aso/context.html`。HTML 结构示例：
 
-## 基础信息
-- **App ID**: [从 README 或 CLAUDE.md 提取，找不到则 ?待补充]
-- **Bundle ID**: [扫 Xcode 项目或 Manifest 提取]
-- **类型**: [iOS/Android/跨平台]
-- **覆盖 locale**: [扫 Localizable.xcstrings 或 strings 文件统计]
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{App Name} — ASO Context</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 1000px; margin: 2em auto; padding: 0 1em; line-height: 1.6; }
+    h1, h2 { border-bottom: 1px solid #ddd; padding-bottom: .3em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f5f5f5; }
+    .source { color: #888; font-size: .85em; font-style: italic; }
+    .warn { color: #c00; }
+    .ok { color: #060; }
+    code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>{App Name} 项目特定上下文</h1>
+  <p class="source">Generated: {date} | Source: code + docs（Marketing/.md 被禁读）</p>
 
-## App 真实功能（决定 keyword 选词）
+  <h2>基础信息</h2>
+  <table>...App ID / Bundle ID / 类型 / 覆盖 locale / brand_name_per_locale...</table>
 
-### 做的事
-- [从 README 主功能列表提取]
-- [从 Services/ 目录提取核心 service]
-- [从 Views/ 目录提取主要界面行为]
+  <h2>做的事（依据代码反推）</h2>
+  <ul>... 每条带 <span class="source">依据: {file}</span> ...</ul>
 
-### 不做的事（明确边界）
-基于上面"做的事"反推：
-- [若 App 是双人合成 → 明确不做单人风格化/AI 修图]
-- [若 App 是工具类 → 明确不做内容消费]
-- [其他明显边界]
+  <h2>不做的事（明确边界）</h2>
+  <ul>...</ul>
 
-## 商业模型
-- **付费模式**: [从订阅 SDK 集成、IAP 代码提取]
-- **定价**: [从 RevenueCat / 产品代码或截图]
-- **目标用户**: [从市场定位文档/营销文案推断]
+  <h2>商业模型</h2>
+  ...
 
-## 资源位置
-- **截图**: [扫 Marketing/ 目录]
-- **本地化**: [Localizable.xcstrings / strings.xml 等]
-- **市场调研**: [如有 Marketing/*.md 调研报告]
+  <h2>资源位置</h2>
+  <table>...</table>
 
-## 当前 ASO 状态（如已存在）
-- **现有 locale**: [枚举 xcstrings 中所有 lang]
-- **历史 ASO 调研**: [Marketing/ASO_*.md]
-- **最近一次大改时间**: [扫 git log 中 ASO 相关 commit]
+  <h2>推荐核心词类型（按真实功能反推）</h2>
+  ...
 
-## 推荐能用的核心词类型（基于功能反推）
+  <h2>应避免的功能错位词族</h2>
+  <table>... 词族 + 错位赛道 + 风险等级 ...</table>
 
-按黄金原则 #6（赛道对口 ≠ 功能对口），列出此 App **真正能服务**的搜索意图类型：
-
-1. **核心功能词族**: [列 2-3 类]
-2. **场景/品类词**: [列 2-3 类]
-3. **半对口可补充**: [列 1-2 类]
-
-**应避免的功能错位词族**（用户搜进来会失望）：
-- [列 3-5 类]
-
-## 待办与已知未完成
-
-[扫 TODO / FIXME 注释 + Marketing/ 内的 P3 标记]
+  <h2>?待用户补充字段</h2>
+  ...
+</body>
+</html>
 ```
+
+**关键字段**：
+- `brand_name_per_locale` — 各 locale 的品牌名（如 zh-Hans/Hant 用「微出片」而非英文名）。这字段防 Stage 4 误改品牌名（实战教训）
+- 每个结论必须带"依据"（哪个文件哪行）
+- 不确定的字段标 `?待用户补充`
 
 ### Step 4: 用户审核
 
@@ -99,11 +111,11 @@ Agent 输出后，**让用户检查 "做的事 / 不做的事 / 推荐核心词"
 
 ### Step 5: 落地
 
-保存为 `references/{project_root}/.aso/context.md`。
+保存为 `{project_root}/.aso/context.html`。
 
 ### Step 6: 当 App 功能变更后
 
-重新跑 Stage 2 → 覆盖 `{project_root}/.aso/context.md`。Stage 3 调研可能需要相应更新。
+重新跑 Stage 2 → 覆盖 `{project_root}/.aso/context.html`。Stage 3 调研可能需要相应更新。
 
 ## 自动分析的边界（人脑兜底）
 

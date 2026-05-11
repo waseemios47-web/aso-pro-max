@@ -4,6 +4,42 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and t
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-11 — Real end-to-end clean run (afternoon)
+
+### Added
+- **Stage 6: Write plan + execute + verify** (`references/stage6_write_execute.md`)
+  - Independent agent parses Stage 5 HTML → generates writeplan JSON
+  - Main Claude only executes mechanically
+  - Mandatory `aso_audit.py` re-run after writes (with ERROR-fix loop)
+- **Golden Rule #7** "Real end-to-end requires real decontamination":
+  - Archive `Marketing/ASO_*.md` before Stage 2
+  - Temporarily `.bak` `memory/aso-strategy*.md`
+  - Main Claude must NOT participate in Stage 2-6 decisions (use independent agents)
+- **HTML output format** for Stages 2/3/4/5 (replaces markdown)
+  - Browser-readable, structured with `<style>` blocks
+  - Standard classes: `.verified` (iTunes実測通过), `.untested` (limited), `.danger` (错位)
+- **Brand name per locale** field in `project_context_template.md`
+  - Prevents Stage 4 from accidentally overwriting localized brand names (e.g. zh-Hans `微出片` not `WePics`)
+- **Common Mistakes #12-14** documenting newly learned anti-patterns:
+  - Not real-cleaning pollution
+  - LLM inventing geo flavor words (boho/winter/maple — all iTunes-misaligned)
+  - Cross-field conflict checks when merging draft ∪ live state
+
+### Changed
+- SKILL.md restructured to 6-stage flow (was 5)
+- Stage 2 prompt now explicitly forbids reading `Marketing/ASO_*.md` and `.aso/*`
+- Stage 3 emphasizes "honestly label untested" when iTunes 403/429
+- Stage 5 explicitly recommends "draft ∪ live (union merge)" over wholesale replacement
+- iTunes API rate-limit guidance: don't extrapolate or invent geo words; honestly mark `untested`
+
+### Battle-tested against
+- WePics 19-locale end-to-end clean run (2026-05-11 afternoon):
+  - Stage 2: zero Marketing pollution verified
+  - Stage 3: 4 parallel cluster agents → 19 locale HTMLs (iTunes 403s honestly marked)
+  - Stage 4: 129KB HTML with EN/FR/ES/ZH 4-pool stem coordination
+  - Stage 5: 805-line HTML decision report including "real-clean vs half-clean" diff
+  - Stage 6: 17 locale writes + 2 zh-Hans/Hant follow-up = **0 ERROR on first audit**
+
 ## [0.1.0] - 2026-05-11
 
 ### Added — initial public release

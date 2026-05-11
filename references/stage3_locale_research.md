@@ -13,7 +13,7 @@
 
 ### Step 1: 准备输入
 
-- 读 `{project_root}/.aso/context.md`（Stage 2 产出）
+- 读 `{project_root}/.aso/context.html`（Stage 2 产出）
 - 决定目标 locale 列表（参考 `locale_strategy.md` 通用市场分级）
 - 决定集群分组（一般 3-4 个 locale 一组并行）
 
@@ -36,7 +36,7 @@
 我要为 {APP_NAME} 在 {LOCALE_LIST} 市场做 ASO，需要调研每个 locale。
 
 App 真实功能（必读）：
-{粘贴 {project_root}/.aso/context.md 的"做的事/不做的事"节}
+{粘贴 {project_root}/.aso/context.html 的"做的事/不做的事"节}
 
 请并行/串行调研 {LOCALE_LIST} 每个 locale：
 
@@ -51,7 +51,13 @@ App 真实功能（必读）：
 输出格式严格按下方模板，每个 locale 一份。
 ```
 
-### Step 4: 单 locale 调研输出模板
+### Step 4: 单 locale 调研输出模板（HTML 格式）
+
+输出到 `{project_root}/.aso/locale/{LOCALE}.html`。参考 Stage 2 的 `context.html` 样式。
+
+**iTunes 限流处理**（实战教训）：4 个并行 Agent 同时跑 iTunes 必触发 IP 限流（403/429）。限流时不要"凭直觉外推"或"LLM 编地域风情词"——上次 en-AU/CA 的 `boho/winter/maple` 全错位。老实在 HTML 中用 `class="untested"` 标记。
+
+7 节结构（HTML 字段对应下方 markdown 说明）：
 
 ```markdown
 # {App Name} - {LOCALE} 市场调研
@@ -123,12 +129,12 @@ App 真实功能（必读）：
 ### Step 5: 汇总
 
 把每个 locale 的调研存到项目内（**不进 skill**）：
-- `Marketing/aso_locale_research/{LOCALE}.md`
+- `Marketing/aso_locale_research/{LOCALE}.html`
 - 或 `Marketing/ASO_Deep_Review_{YYYY-Q}.md`（合并所有 locale 一文）
 
 ### Step 6: 更新 skill 内 context
 
-把每个 locale 调研的关键结论（核心词 + 错位词警告 + 跨索引）摘要回 `{project_root}/.aso/context.md` 的「locale 调研摘要」节，方便 Stage 4 起草和 Stage 5 校验时快速引用。
+把每个 locale 调研的关键结论（核心词 + 错位词警告 + 跨索引）摘要回 `{project_root}/.aso/context.html` 的「locale 调研摘要」节，方便 Stage 4 起草和 Stage 5 校验时快速引用。
 
 ## 并行 vs 串行权衡
 
