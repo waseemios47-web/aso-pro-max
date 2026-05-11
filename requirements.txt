@@ -1,0 +1,17 @@
+# Python ≥ 3.10 required (uses PEP 604 union types and PEP 585 generics)
+
+# Core (always needed)
+requests>=2.28
+
+# stem detection (Snowball stemmer for cross-field same-root catch)
+nltk>=3.8
+
+# JWT for ASA OAuth (optional, future Apple Ads Platform API)
+PyJWT[crypto]>=2.10
+cryptography>=42.0
+
+# Google Trends signals (optional, often rate-limited by Google)
+pytrends>=4.9
+
+# Note: asc CLI is a separate tool, install via:
+#   brew install rudrankriyam/tap/asc

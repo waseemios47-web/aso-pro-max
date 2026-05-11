@@ -1,0 +1,25 @@
+# Credentials (should never be in this repo — store in ~/.config/aso-pro-max/)
+.env
+.secrets/
+*.pem
+*.key
+*token_cache*
+
+# Python build artifacts (pyc files embed absolute paths of source files)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Test/dev artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+/tmp/
+

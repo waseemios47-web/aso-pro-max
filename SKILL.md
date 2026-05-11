@@ -1,404 +1,186 @@
 ---
 name: aso-pro-max
 description: |
-  App Store Optimization (ASO) 专家级工具 — 审计、优化和扩展 App Store 元数据以最大化搜索可见性和下载转化率。
-  Use this skill whenever the user mentions any of the following:
-  - ASO, App Store Optimization, 应用商店优化
-  - Review/audit app store metadata, keywords, title, subtitle
-  - Optimize keywords, expand to new markets/languages
-  - "review my ASO", "optimize keywords", "add new language to ASC"
-  - "check my app store listing", "improve search ranking"
-  - Multi-language/locale expansion strategy
-  - Keyword analysis, keyword deduplication, keyword coverage
-  Even if the user doesn't explicitly say "ASO", use this skill for any task involving optimizing App Store search visibility, keyword strategy, or multi-locale metadata expansion.
+  App Store Optimization (ASO) 端到端 — 从抓最新 ASO 知识、分析 App 功能、多语言市场调研、起草候选词、到三层校验写入。
+  触发场景：
+  - 用户提到 ASO、应用商店优化、关键词策略、多语言扩展
+  - 审计 / 检查 / 优化 App Store 的 name / subtitle / keywords / description
+  - 新增 ASC locale、扩展市场、修复跨字段重复
+  - 截图标题对齐 ASO 关键词（Apple 2025 截图索引算法）
+  - 提到 asc CLI、ASC API、metadata pull/push、raw PATCH
+  - 为新 App 从零做 ASO（端到端 5 阶段）
+  即使用户没明说 "ASO"，凡涉及搜索可见性 / 关键词覆盖 / 多 locale 元数据，都用此 skill。
 ---
 
-# ASO Pro Max — App Store Optimization Expert
+# ASO Pro Max — 端到端 5 阶段
 
-## Overview
+## 工具集
 
-This skill turns Claude into a professional ASO (App Store Optimization) consultant. It covers the complete lifecycle: auditing existing metadata, optimizing Name/Subtitle/Keywords for maximum search coverage, expanding to new locales for market reach, and ensuring zero wasted character budget.
+```
+~/.claude/skills/aso-pro-max/
+├── SKILL.md                              # 本文件（导航 + 决策树）
+├── .env / .env.example                   # ASA 凭据（保留备用）
+├── scripts/
+│   ├── aso_audit.py                      # Stage 5 主审计（字符预算/跨字段/跨 locale/CJK 子串/音译陷阱）
+│   ├── itunes_search_check.py            # Stage 3+5 iTunes Search API 赛道验证
+│   ├── google_signals.py                 # Stage 3+5 Google Trends + Suggest 补充信号
+│   └── asa_auth.py                       # 备用：未来 Apple Ads Platform API
+└── references/
+    ├── stage1_industry_refresh.md        # Stage 1: 抓最新 ASO 知识（季度）
+    ├── stage2_app_analysis.md            # Stage 2: 扫代码自动生成 {app}_context.md
+    ├── stage3_locale_research.md         # Stage 3: 并行多 Agent 调研各 locale
+    ├── stage4_keyword_drafting.md        # Stage 4: 基于 2+3 起草候选词
+    ├── stage5_audit_validate.md          # Stage 5: 三层校验 + 写入 ASC
+    ├── locale_strategy.md                # 通用：跨 locale 索引 / 音译陷阱 / 市场分级
+    ├── asc_cli_recipes.md                # 通用：asc CLI + raw PATCH 坑
+    ├── screenshot_keyword_audit.md       # 通用：截图标题对齐（任务 C）
+    ├── asa_api_limitations.md            # ⚠️ ASA API 调研负面结论
+    └── project_context_template.md       # 项目 context 空白模板（用户拷到自己项目里填）
+```
 
-**Prerequisites**: The `appstore-connect` skill must be available for API calls. Ensure `ASC_ISSUER_ID`, `ASC_KEY_ID`, and `ASC_PRIVATE_KEY_PATH` are configured.
+## 5 阶段端到端流程
 
-## Core ASO Principles
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ Stage 1: 抓 ASO 行业最新知识（季度跑 1 次）                       │
+│   并行多 Agent 抓 Apple/AppTweak/Sensor Tower/论坛                │
+│   → 更新 SKILL.md 黄金原则 / locale_strategy / asa_limitations    │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│ Stage 2: 分析 App 真实功能（每个 App 1 次，重大改版后复跑）        │
+│   Explore Agent 扫 README / CLAUDE.md / Models / Services         │
+│   → 生成 {project_root}/.aso/context.md                              │
+│   关键：明确"做什么 / 不做什么"，反推哪类词会功能错位（原则 #6）   │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│ Stage 3: 多语言市场调研（每个 locale 首次 1 次）                   │
+│   并行 4 集群 Agent 调研（EN 4 池 / CJK / 欧洲 / 新兴）            │
+│   每个 Agent 用 itunes_search_check.py 验证赛道                   │
+│   → Marketing/aso_locale_research/{LOCALE}.md 一份每 locale        │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│ Stage 4: 起草候选词（每个 locale 写入前 1 次）                     │
+│   基于 Stage 2 + Stage 3 起草 Name/Subtitle/Keywords              │
+│   含跨字段预演 + 跨同语言 locale 协调                              │
+│   → /tmp/{app}_drafts_{date}.json                                 │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│ Stage 5: 三层校验 + 写入（每次改动必跑）                            │
+│   Layer 1 机械: aso_audit.py（字符/跨字段/跨 locale/CJK 子串/音译）│
+│   Layer 2 赛道: itunes_search_check.py（Top 5 竞品类型）           │
+│   Layer 3 功能: 人脑（搜进来会失望吗？）+ ASC Analytics            │
+│   → asc localizations update 写入                                  │
+│   → 写入后必跑 audit verify（防引入新错）                          │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-### 1. Apple's Search Index = Name + Subtitle + Keywords (Combined Pool)
+## 决策树：用户来了我先跑哪个 Stage？
 
-Apple's algorithm indexes **all three fields together** as a unified pool. A word appearing in ANY of the three fields is indexed. Therefore:
+```
+用户请求 / 触发场景 → 走哪个 Stage？
 
-> **NEVER repeat a word across Name, Subtitle, and Keywords. Every repetition wastes precious characters.**
+"看下/优化/审计 keywords"             → 直接 Stage 5
+"为某 locale 起草新方案"                → Stage 4 → Stage 5
+"新增 locale"                          → Stage 3 + 4 + 5
+"接手新 App / App 上下文不熟"           → Stage 2 → 后续按需
+"做一份新的全 locale 深度调研"          → Stage 3
+"看看 ASO 最近有什么新动向"             → Stage 1
+"截图标题与 keywords 对齐"              → 任务 C（screenshot_keyword_audit.md）
+```
 
-### 2. Field Weight Hierarchy
+## 黄金原则（6 条，违反任何一条都意味着真金白银的浪费）
 
-| Field | Weight | Limit | Purpose |
-|-------|--------|-------|---------|
-| **Name** | Highest | 30 chars | Brand + #1 keyword |
-| **Subtitle** | High | 30 chars | #2 keyword + value prop |
-| **Keywords** | Medium | 100 chars | All remaining search terms |
+1. **Name + Subtitle + Keywords 是统一索引池** — 跨字段绝不重复任何词（含同根词）
+2. **字符预算 = 钱** — Name 用满 ≥15（CJK 可豁免）、Subtitle 用满 ≥20、Keywords 用满 95-100
+3. **同语言多 locale 各自独立 100 字符** — en-US/GB/AU/CA 用 4 套不同词，绝不重复
+4. **音译陷阱**：vintage / retro / romantic 在非英语 locale 搜索量极低，删了换本地原生词
+5. **截图标题 2025 年起被索引** — 截图既是转化资产也是 ASO 资产，标题要承接核心搜索词
+6. **「赛道对口」≠「功能对口」** — iTunes Top 竞品在同一大类（如 AI 图像处理）不代表 App 真能服务该搜索意图。每个候选词必须问：**搜这个词的用户点进这个 App 后会失望吗？** 失望→转化率低→Apple 算法降权。宁可空 keywords 字段也不堆功能错位词。
 
-### 3. Character Budget = Money
+## 任务对应入口
 
-Every unused character is a missed search opportunity. Target:
-- Name: Use 20-30 chars (include core keyword)
-- Subtitle: Use 20-30 chars (different keywords from Name)
-- Keywords: Use 95-100 chars (fill it up!)
+| 用户请求 | 任务 | 入口 reference |
+|---|---|---|
+| 审计现有 / 优化 keywords | 任务 A | `stage5_audit_validate.md` |
+| 扩展新 locale | 任务 B | `stage3` + `stage4` + `stage5` |
+| 截图标题 ASO 对齐 | 任务 C | `screenshot_keyword_audit.md` |
+| 深度多语言调研 | 任务 D | `stage3_locale_research.md` |
+| 接手新 App | 任务 E | `stage2_app_analysis.md` |
+| ASO 季度行业刷新 | 任务 F | `stage1_industry_refresh.md` |
 
-### 4. Locale Multiplication Strategy
+## 字段限制速查
 
-Each App Store locale gets its own independent 100-char keyword field. By adding locales (even without translating the app UI), you multiply your keyword coverage:
+| 字段 | 限制 | 用什么装 |
+|------|------|---------|
+| Name | 30 codepoints | Brand + #1 关键词 |
+| Subtitle | 30 codepoints | #2-#3 关键词 + 价值主张 |
+| Keywords | 100 codepoints | 剩余所有词，逗号分隔（**不加空格**）|
+| Promotional Text | 170 codepoints | 营销文案（不被索引）|
+| Description | 4000 codepoints | SEO 长文，前 3 行最重要 |
 
-| Strategy | Keyword Capacity |
-|----------|:----:|
-| en-US only | 100 chars |
-| + en-GB, en-AU, en-CA | 400 chars |
-| + de, fr, es, it, etc. | 1,500+ chars |
+## 项目数据 vs Skill 数据（重要架构约定）
 
-**Key insight**: Users in these markets see localized metadata in search results. The app UI falls back to English — but they can FIND the app in their language.
+**skill 不存储任何项目数据**。所有 App 特定的 context、调研、草案、audit 归档都放在**项目自己的目录**下：
 
-## Workflow 1: Audit Existing ASO Metadata
+```
+{project_root}/.aso/
+├── context.md              # Stage 2 产出（App 功能分析）
+├── locale/{LL}.md          # Stage 3 产出（每 locale 一份调研）
+├── drafts/{date}.json      # Stage 4 产出（候选词草案）
+└── reports/audit_{date}.md # Stage 5 audit 历史归档
+```
 
-### Step 1: Pull current state
+skill 内只放空白模板 `references/project_context_template.md`——用户首次为某 App 跑 Stage 2 时，把模板拷到 `{project}/.aso/context.md` 然后由 Agent 填充。
+
+**好处**：
+- skill 干净可分发（任何项目通用）
+- 项目数据跟项目走（用户自己版本化 / .gitignore）
+- skill 升级不影响项目数据
+- 多 App 互不污染
+
+## 安装 / 卸载 / 健康检查
 
 ```bash
-ASC="node /path/to/asc-api.js"
+# 安装（首次）
+git clone <repo> ~/.claude/skills/aso-pro-max     # 或 symlink 本地开发
+pip3 install -r ~/.claude/skills/aso-pro-max/requirements.txt
+brew install rudrankriyam/tap/asc                  # asc CLI（ASC API 访问）
+asc auth init                                      # 多账号用 asc auth switch --name <profile>
 
-# Get app info localizations (name, subtitle)
-$ASC get-app-info-localizations <appInfoId>
+# 健康检查
+python3 ~/.claude/skills/aso-pro-max/scripts/aso_audit.py \
+  --from-file ~/.claude/skills/aso-pro-max/examples/sample_snapshot.json
+# 应输出 2 个 ERROR + 3 个 WARN（教学示例）
 
-# Get version localizations (keywords, description)
-$ASC get-localizations <versionId>
+# 可选：ASA OAuth（未来 Apple Ads Platform API 准备）
+mkdir -p ~/.config/aso-pro-max/.secrets
+cp ~/.claude/skills/aso-pro-max/.env.example ~/.config/aso-pro-max/.env
+# 编辑 ~/.config/aso-pro-max/.env 填凭据
+openssl ecparam -genkey -name prime256v1 -noout \
+  -out ~/.config/aso-pro-max/.secrets/asa_private_key.pem
+python3 ~/.claude/skills/aso-pro-max/scripts/asa_auth.py   # 应显示 ✅ 认证成功
+
+# 卸载
+rm -rf ~/.claude/skills/aso-pro-max
+rm -rf ~/.config/aso-pro-max     # 凭据存储位置
 ```
 
-### Step 2: Build audit table
-
-For each locale, extract and display:
-
-```
-Locale   | Name (len/30) | Subtitle (len/30) | Keywords (len/100)
----------|---------------|-------------------|-------------------
-en-US    | MyApp (5/30) | AI Photo Edit... (28) | photo,edit... (91)
-```
-
-### Step 3: Check for these issues
-
-**Issue 1: Keyword field underutilized**
-- Any locale with keywords < 90/100 chars is wasting search potential
-- Target: 95-100 chars for every locale
-
-**Issue 2: Cross-field duplication**
-- Extract all words from Name + Subtitle
-- Check if any of those words appear in Keywords
-- Every duplicate = wasted keyword chars
-
-**Issue 3: Name field too short**
-- Name under 15 chars for a non-famous brand = wasted opportunity
-- Pattern: `BrandName - Core Keyword` (e.g., "MyApp - AI Photo Editor")
-
-**Issue 4: Subtitle duplicates Name**
-- If Name and Subtitle share >50% of words, the subtitle is wasted
-- Subtitle should introduce DIFFERENT keywords
-
-### Step 4: Report format
-
-Present findings as:
-
-```markdown
-## ASO Audit Report
-
-### Problem Summary
-| Issue | Affected Locales | Impact |
-|-------|-----------------|--------|
-| Keywords underutilized | ko(44/100), zh-Hant(46/100) | 56+ chars wasted per locale |
-| Cross-field duplication | ja, ko, vi | 3-5 wasted keyword slots |
-| Name too short | en-US(6/30), zh-Hans(3/30) | Missing high-weight keywords |
-
-### Optimization Proposals
-(Show before/after for each field with change rationale)
-```
-
-## Workflow 2: Optimize Name + Subtitle + Keywords
-
-### Optimization Algorithm
-
-For each locale:
-
-1. **Name optimization**: If Name < 20 chars and brand is not globally famous:
-   ```
-   "{Brand} - {#1 Search Term in this language}"
-   ```
-   Example: `MyBrand - AI Photos` (7 → 20 chars)
-
-2. **Subtitle optimization**: Remove any words already in the optimized Name. Replace with new high-value keywords:
-   ```
-   Before: "AI Photo Editor App" (repeats "AI Photo" from Name)
-   After:  "One-tap portraits & filters" (all new words)
-   ```
-
-3. **Keyword optimization**:
-   - List all words already indexed from Name + Subtitle
-   - Remove ALL of them from Keywords
-   - Fill freed space with new search terms
-   - Prioritize: high-search-volume terms > niche terms > synonyms
-
-### Keyword Selection Strategy by Language
-
-**Latin-alphabet languages** (en, fr, es, de, it, pt, tr, vi):
-- Apple splits keywords by commas AND may split by spaces
-- Single words are more flexible: "bride" matches "bride", "bridal" needs separate entry
-- Use singular form (Apple matches plural automatically)
-
-**CJK languages** (zh, ja, ko):
-- Chinese: Characters are dense, each char carries meaning. Pack more terms.
-- Japanese: Mix of kanji + katakana. Include both forms of loan words.
-- Korean: Compound words common. 웨딩사진 = 웨딩 + 사진, both indexed.
-
-**Arabic/Thai**:
-- Longer character sequences per word, budget runs out faster
-- Focus on the most essential 12-15 terms
-
-### Same-Language Locale Trick
-
-For languages with multiple locales (en, fr, es), use DIFFERENT keywords per locale to maximize total coverage:
-
-```
-en-US keywords: marriage,bride,groom,bridal,engagement,face,swap,...     (100/100)
-en-GB keywords: photograph,picture,ceremony,honeymoon,edit,filter,...    (100/100)
-en-AU keywords: pic,image,proposal,enhance,blend,collage,gallery,...    (97/100)
-en-CA keywords: portrait,editor,beauty,selfie,pose,celebration,...      (97/100)
-                                                              Total: ~400 chars, 62 unique words
-```
-
-This gives 4x keyword coverage with zero additional effort.
-
-Same for:
-- `fr-FR` + `fr-CA`: Different keyword sets
-- `es-ES` + `es-MX`: Different keyword sets
-
-## Workflow 3: Expand to New Locales
-
-### Market Prioritization Framework
-
-Score each market on 3 axes:
-
-| Factor | Weight | How to assess |
-|--------|--------|---------------|
-| **iOS purchasing power** | 40% | GDP per capita × iOS market share |
-| **Product-market fit** | 35% | Does this culture have demand for your app's core feature? |
-| **Competition density** | 25% | How many competing apps have this locale? |
-
-### Tier List Example (Adjust per product)
-
-| Tier | Markets | Rationale |
-|------|---------|-----------|
-| **Tier 1** | de-DE, fr-FR, es-ES, it, ar-SA | High spending + iOS dominant |
-| **Tier 2** | th, pt-BR, tr | Strong culture fit + growing iOS |
-| **Tier 3** | fr-CA, es-MX | Extra keyword pool (low effort) |
-| **Skip** | id, ms, hi | Low iOS adoption + low spending at $5-10/mo price point |
-
-### Per-Locale Creation Checklist
-
-For each new locale, create:
-
-1. **App Info Localization** (name + subtitle):
-   ```bash
-   $ASC create-app-info-localization <appInfoId> <locale> \
-     --name="..." --subtitle="..."
-   ```
-
-2. **Version Localization** (description + keywords):
-   ```bash
-   # This is auto-created when app-info localization is created.
-   # Find its ID:
-   $ASC get-localizations <versionId>
-
-   # Update with description + keywords via raw PATCH:
-   $ASC raw PATCH /v1/appStoreVersionLocalizations/<locId> @body.json
-   ```
-
-3. **Screenshot Sets** (iPhone + iPad):
-   ```bash
-   # Create sets
-   $ASC create-screenshot-set <locId> APP_IPHONE_65
-   $ASC create-screenshot-set <locId> APP_IPAD_PRO_3GEN_129
-
-   # Upload (can reuse English screenshots for non-primary markets)
-   $ASC upload-screenshot <setId> /path/to/screenshot.png
-   ```
-
-### Description Template
-
-Every locale's description should follow this structure:
-
-```
-{AppName} — {One-line value prop}
-
-{2-sentence hook: what the app does + why it's effortless}
-
-【Features/Fonctionnalités/Funktionen/...】
-・Feature 1: {specific detail}
-・Feature 2: {specific detail}
-・...
-
-【Who is it for?】
-・Use case 1
-・Use case 2
-・...
-
-【Subscription】
-・Free: {free tier info}
-・Manage/cancel: Settings → Apple ID → Subscriptions
-
-{Localized "Terms of Service & Privacy Policy"}
-- https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-- {Your privacy policy URL}
-```
-
-**CRITICAL**: The Terms of Service & Privacy Policy section must appear at the end of EVERY locale's description. Missing it can cause App Review rejection.
-
-## Workflow 4: Batch Operations
-
-### Add 10+ locales efficiently
-
-Use Python for batch operations instead of bash loops (avoids shell parsing issues with Unicode):
-
-```python
-import subprocess, json
-
-ASC = ["node", "/path/to/asc-api.js"]
-LOCALES = {
-    "de-DE": {"name": "...", "subtitle": "...", "keywords": "...", "description": "..."},
-    "fr-FR": {"name": "...", ...},
-    # ...
-}
-
-# Step 1: Create app info localizations
-for locale, meta in LOCALES.items():
-    subprocess.run(ASC + [
-        "create-app-info-localization", APP_INFO_ID, locale,
-        f"--name={meta['name']}", f"--subtitle={meta['subtitle']}"
-    ])
-
-# Step 2: Find auto-created version localization IDs
-result = subprocess.run(ASC + ["get-localizations", VERSION_ID], capture_output=True, text=True)
-loc_ids = {
-    loc["attributes"]["locale"]: loc["id"]
-    for loc in json.loads(result.stdout)["data"]
-}
-
-# Step 3: Update descriptions + keywords via raw PATCH
-for locale, meta in LOCALES.items():
-    body = {
-        "data": {
-            "type": "appStoreVersionLocalizations",
-            "id": loc_ids[locale],
-            "attributes": {
-                "description": meta["description"],
-                "keywords": meta["keywords"],
-                "supportUrl": "https://your-site.com"
-            }
-        }
-    }
-    json.dump(body, open(f"/tmp/{locale}.json", "w"), ensure_ascii=False)
-    subprocess.run(ASC + ["raw", "PATCH",
-        f"/v1/appStoreVersionLocalizations/{loc_ids[locale]}",
-        f"@/tmp/{locale}.json"])
-
-# Step 4: Create screenshot sets + upload
-for locale, loc_id in loc_ids.items():
-    for display_type in ["APP_IPHONE_65", "APP_IPAD_PRO_3GEN_129"]:
-        r = subprocess.run(ASC + ["create-screenshot-set", loc_id, display_type],
-                          capture_output=True, text=True)
-        set_id = json.loads(r.stdout)["data"]["id"]
-        for f in screenshot_files:
-            subprocess.run(ASC + ["upload-screenshot", set_id, f])
-```
-
-## Workflow 5: Verification
-
-### Post-optimization checklist
-
-After all changes, run a full audit to verify:
-
-```python
-# Pull all locales and verify completeness
-for locale in all_locales:
-    assert len(name) <= 30
-    assert len(subtitle) <= 30
-    assert len(keywords) <= 100
-    assert len(keywords) >= 90  # Should be nearly full
-    assert len(description) > 500  # Meaningful description
-    assert "privacy" in description.lower() or "隐私" in description  # ToS present
-    assert screenshot_count >= 10  # iPhone + iPad
-```
-
-Display as a summary table:
-```
-Locale   │ Name(len) │ Sub(len) │ KW(len) │ Desc │ Screenshots
-─────────┼───────────┼──────────┼─────────┼──────┼────────────
-en-US    │ ✅ 26/30  │ ✅ 27/30 │ ✅100   │ 1401 │ ✅ 10
-de-DE    │ ✅ 26/30  │ ✅ 27/30 │ ✅ 96   │ 1268 │ ✅ 10
-...
-```
-
-## Common Mistakes to Avoid
-
-1. **Repeating keywords across Name/Subtitle/Keywords** — #1 most common mistake. Apple indexes them together.
-
-2. **Keywords field half-empty** — If you're at 44/100 chars, you're leaving half your search potential on the table.
-
-3. **Same keywords in fr-FR and fr-CA** — You get two separate 100-char pools. Use different words in each!
-
-4. **Adding low-spending locales** — Indonesia (id), India (hi) at $8/month subscription = almost zero conversion. Prioritize de-DE, ar-SA, fr-FR.
-
-5. **Forgetting ToS/Privacy Policy in description** — Must appear in EVERY locale. App Review will flag this.
-
-6. **Using spaces after commas in Keywords** — `bride, groom` wastes 1 char vs `bride,groom`. Multiply by 15 terms = 15 chars wasted.
-
-7. **Not verifying after changes** — Always pull metadata back from ASC and verify. API calls can silently truncate or fail.
-
-## Quick Reference: Apple Locale Codes
-
-### High-value locales (prioritize these)
-```
-en-US, en-GB, en-AU, en-CA    — English (4 keyword pools!)
-zh-Hans                         — Simplified Chinese (China)
-zh-Hant                         — Traditional Chinese (Taiwan/HK)
-ja                              — Japanese
-ko                              — Korean
-de-DE                           — German
-fr-FR, fr-CA                   — French (2 pools)
-es-ES, es-MX                  — Spanish (2 pools)
-it                              — Italian
-ar-SA                           — Arabic (Saudi/UAE/Gulf)
-pt-BR                           — Portuguese (Brazil)
-th                              — Thai
-tr                              — Turkish
-vi                              — Vietnamese
-```
-
-### Lower priority (evaluate per product)
-```
-id        — Indonesian (low iOS spending)
-ms        — Malay (small market)
-hi        — Hindi (low iOS adoption)
-ru        — Russian
-nl        — Dutch
-sv        — Swedish
-da        — Danish
-no        — Norwegian
-fi        — Finnish
-pl        — Polish
-uk        — Ukrainian
-el        — Greek
-he        — Hebrew
-ro        — Romanian
-hu        — Hungarian
-cs        — Czech
-sk        — Slovak
-```
-
-### NOT valid ASC locales (will error)
-```
-en-IN, en-SG, en-PH, en-ZA   — Apple doesn't support these English variants
-```
+Python 要求：**≥ 3.10**（脚本使用 PEP 604/585 类型语法）。
+
+## 常见错误
+
+1. 跨字段重复（Name/Subtitle/Keywords 共词）
+2. Keywords 字段未填满
+3. 同语言 locale 用相同 keywords
+4. 音译词填充非英语 locale
+5. description 多行字段直接 CLI 传参（必须 raw PATCH）
+6. 逗号后加空格（每次浪费 1 字符）
+7. 改完不复查（必须复跑 aso_audit.py verify）
+8. **功能错位词**（黄金原则 #6）— iTunes Top 赛道对了不代表 App 能服务该意图
+9. **用大热单字赌曝光** — face / dating / generator / avatar / ring / wed / duo 在 EN 都被巨头垄断
+10. **跳过 Stage 2 直接起草** — 不清楚 App 真实功能 → Stage 3 调研偏 → Stage 4 起草必错
+11. **同语言 locale 不协调起草** — 后期一定碰跨 locale 同根冲突（实战教训）

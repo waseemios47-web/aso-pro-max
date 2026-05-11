@@ -1,0 +1,28 @@
+{
+  "_comment": "Example ASC metadata snapshot for offline aso_audit.py testing. Run: python scripts/aso_audit.py --from-file examples/sample_snapshot.json",
+  "app_info": {
+    "en-US": {
+      "name": "SampleApp - AI Photo Maker",
+      "subtitle": "Wedding & Couple Photos in Sec"
+    },
+    "en-GB": {
+      "name": "SampleApp - AI Photo Maker",
+      "subtitle": "Wedding & Couple Photos in Sec"
+    },
+    "ja": {
+      "name": "SampleApp — AI ウェディング写真",
+      "subtitle": "二人の写真で結婚写真を生成"
+    }
+  },
+  "version": {
+    "en-US": {
+      "keywords": "engagement,swap,face fusion,nuptials,vows,knot,elopement,deepfake,bachelorette,wedding ring"
+    },
+    "en-GB": {
+      "keywords": "wedding,prewedding,brides,bouquet,wedlock,save the date,ever after,newlyweds,maid of honor"
+    },
+    "ja": {
+      "keywords": "婚礼,神社,カップル,記念写真,白無垢,色打掛,和装,新郎,合成写真,着物,AI写真,ウェディング,スタジオ"
+    }
+  }
+}

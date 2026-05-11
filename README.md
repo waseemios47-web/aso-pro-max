@@ -1,166 +1,130 @@
-# ASO Pro Max — Claude Code Skill for App Store Optimization
+# aso-pro-max
 
-[English](#english) | [中文](#中文)
+**End-to-end App Store Optimization toolkit.** Audit, research, draft, and validate ASO metadata across 19+ locales using free public APIs — no AppTweak/Sensor Tower subscription required.
 
----
+Built as a [Claude Code](https://claude.com/claude-code) skill, also usable as standalone Python scripts.
 
-<a id="english"></a>
-## English
+> 中文用户：本工具方法论与文档均为中文撰写，README 提供英文入口供国际用户参考。详细使用见 `SKILL.md` 与 `references/`。
 
-A professional-grade [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that turns Claude into an ASO (App Store Optimization) expert. It covers the complete lifecycle: auditing existing metadata, optimizing Name/Subtitle/Keywords for maximum search coverage, expanding to new locales, and ensuring zero wasted character budget.
+## Why this exists
 
-### What It Does
+ASO tools cost €99-499/month. Independent developers can't justify that. This toolkit fills the gap with three insights:
 
-- **Audit** existing App Store metadata across all locales — find underutilized keywords, cross-field duplication, and wasted characters
-- **Optimize** Name, Subtitle, and Keywords using Apple's indexing rules (combined pool deduplication)
-- **Expand** to new locales for multiplied keyword coverage (even without translating the app UI)
-- **Batch operations** for adding 10+ locales efficiently via App Store Connect API
-- **Verify** all changes with automated completeness checks
+1. **Mechanical detection is free** — character budgets, cross-field stem overlaps, CJK substring leaks, transliteration traps. The script `aso_audit.py` catches all of these automatically.
+2. **Free competitive signals exist** — iTunes Search API (public, no key) returns top-5 competitors per keyword per storefront. Google Suggest reveals autocomplete demand. ASC Analytics shows your real traffic-driving search terms.
+3. **The hidden trap is "category match ≠ function match"** — your `ghibli` keyword may land on ChatGPT's territory (AI stylization), but if your app does couple compositing, users searching `ghibli` will bounce. We codify this as Golden Rule #6.
 
-### Key Principles
+## Features
 
-1. **Apple indexes Name + Subtitle + Keywords as ONE pool** — never repeat words across fields
-2. **Every unused character = missed search opportunity** — target 95-100/100 chars for Keywords
-3. **Locale multiplication** — 4 English locales = 4 × 100 chars = 400 keyword chars
-4. **Same-language locales get DIFFERENT keywords** — en-US, en-GB, en-AU, en-CA each with unique terms
+- **Audit** — character budget, cross-field same-root detection (Snowball stemmer for EN/FR/DE/ES/IT/PT/AR + 16 other languages), CJK substring overlap detection, cross-locale duplication, transliteration trap lookup
+- **Research** — iTunes Search API competitor analysis, Google Trends + Suggest signals
+- **End-to-end 5-stage workflow** — industry refresh → app analysis → locale research → keyword drafting → validation + write
+- **6 battle-tested golden rules** including the often-missed "category match ≠ function match"
+- **Multi-locale aware** — handles same-language locale pools (en-US/GB/AU/CA, fr-FR/CA, es-ES/MX) with cross-locale stem checks
 
-### Installation
-
-Copy the `SKILL.md` file to your Claude Code skills directory:
+## Quick start
 
 ```bash
-mkdir -p ~/.claude/skills/aso-pro-max
-cp SKILL.md ~/.claude/skills/aso-pro-max/SKILL.md
+# 1. Clone (or symlink) into Claude Code skills dir
+git clone <repo> ~/.claude/skills/aso-pro-max
+
+# 2. Install Python deps (requires Python ≥ 3.10)
+pip install -r ~/.claude/skills/aso-pro-max/requirements.txt
+
+# 3. Install asc CLI (for ASC API access)
+brew install rudrankriyam/tap/asc
+asc auth init
+
+# 4. (Optional) Set up ASA OAuth for future Apple Ads Platform API
+mkdir -p ~/.config/aso-pro-max/.secrets
+cp ~/.claude/skills/aso-pro-max/.env.example ~/.config/aso-pro-max/.env
+# Edit ~/.config/aso-pro-max/.env with your ASA credentials
+# Generate private key:
+openssl ecparam -genkey -name prime256v1 -noout -out ~/.config/aso-pro-max/.secrets/asa_private_key.pem
+openssl ec -in ~/.config/aso-pro-max/.secrets/asa_private_key.pem -pubout
 ```
 
-### Prerequisites
-
-This skill works best with an App Store Connect API integration skill for automated metadata operations. Without it, you can still use the ASO knowledge for manual optimization.
-
-### Usage
-
-Once installed, Claude Code will automatically activate this skill when you mention:
-
-- "Review my ASO" / "Audit my app store metadata"
-- "Optimize keywords" / "Improve search ranking"
-- "Add new language to App Store Connect"
-- "Expand to new markets"
-- Any task involving App Store search visibility or keyword strategy
-
-#### Example Prompts
-
-```
-Review my App Store metadata and suggest ASO improvements.
-
-Optimize my keywords for en-US — I'm only using 44 out of 100 characters.
-
-Add German (de-DE), French (fr-FR), and Spanish (es-ES) to my App Store listing.
-
-I have en-US keywords set up. Add en-GB, en-AU, en-CA with different keywords to maximize coverage.
-```
-
-### Workflows
-
-| # | Workflow | Description |
-|---|---------|-------------|
-| 1 | **Audit** | Pull all locales, build char-count table, identify 4 issue types |
-| 2 | **Optimize** | Deduplicate across fields, fill keyword budget, per-language strategies |
-| 3 | **Expand** | Market prioritization framework, per-locale creation checklist |
-| 4 | **Batch Ops** | Python scripts for adding 10+ locales at once |
-| 5 | **Verify** | Post-optimization completeness checks |
-
-### Common Mistakes This Skill Prevents
-
-1. Repeating keywords across Name/Subtitle/Keywords (Apple indexes them together)
-2. Keywords field half-empty (leaving search potential on the table)
-3. Same keywords in fr-FR and fr-CA (wasting the second keyword pool)
-4. Spaces after commas in Keywords (`bride, groom` wastes 1 char each)
-5. Missing Terms of Service & Privacy Policy in descriptions
-6. Not verifying after API changes (silent truncation)
-
----
-
-<a id="中文"></a>
-## 中文
-
-一个专业级 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 技能，让 Claude 变身 ASO（App Store 搜索优化）专家。覆盖完整生命周期：审计现有元数据、优化名称/副标题/关键词以最大化搜索覆盖、扩展多语言市场、确保零字符浪费。
-
-### 功能
-
-- **审计** 所有语言的 App Store 元数据 — 发现关键词浪费、跨字段重复、字符预算未用满
-- **优化** 名称、副标题和关键词，遵循 Apple 索引规则（联合池去重）
-- **扩展** 新语言区域以成倍增加关键词容量（无需翻译 App 界面）
-- **批量操作** 通过 App Store Connect API 高效添加 10+ 语言
-- **验证** 自动化完整性检查，确保所有改动生效
-
-### 核心原则
-
-1. **Apple 将名称 + 副标题 + 关键词作为一个联合池索引** — 绝不跨字段重复用词
-2. **每个未用字符 = 错过一次搜索机会** — 关键词字段目标 95-100/100 字符
-3. **语言区域乘数效应** — 4 个英语区域 = 4 × 100 字符 = 400 字符关键词容量
-4. **相同语言的不同区域用不同关键词** — en-US、en-GB、en-AU、en-CA 各放独立词组
-
-### 安装
-
-将 `SKILL.md` 复制到 Claude Code 技能目录：
+## Usage as standalone scripts
 
 ```bash
-mkdir -p ~/.claude/skills/aso-pro-max
-cp SKILL.md ~/.claude/skills/aso-pro-max/SKILL.md
+# Audit your current ASC metadata
+python scripts/aso_audit.py --app-id <YOUR_APP_ID> --version-id <VID>
+
+# Or use a snapshot JSON (offline mode)
+python scripts/aso_audit.py --from-file examples/sample_snapshot.json
+
+# Validate keyword candidates against iTunes Search
+python scripts/itunes_search_check.py --country jp \
+  --keywords "wedding photo,couple portraits,ai bride"
+
+# Cross-platform demand signals (Google Trends + Suggest)
+python scripts/google_signals.py --geo JP --hl ja-JP \
+  --keywords "wedding photo,couple portraits"
 ```
 
-### 前置条件
+## Usage as Claude Code skill
 
-配合 App Store Connect API 集成技能使用效果最佳，可以自动化执行元数据操作。没有它也可以使用 ASO 知识进行手动优化。
+Once installed at `~/.claude/skills/aso-pro-max/`, just ask Claude:
 
-### 使用方法
+> "Audit my app's ASO" / "Optimize en-US keywords" / "Extend to ja locale"
 
-安装后，当你提到以下内容时 Claude Code 会自动激活此技能：
+The skill auto-triggers on ASO-related prompts. See `SKILL.md` for the full workflow.
 
-- "审查我的 ASO" / "审计 App Store 元数据"
-- "优化关键词" / "提高搜索排名"
-- "添加新语言到 App Store Connect"
-- "扩展到新市场"
-- 任何涉及 App Store 搜索可见性或关键词策略的任务
+## Project data layout convention
 
-#### 示例提示
+**This skill stores no project-specific data.** Each project using the skill keeps its own `.aso/` directory at its repo root:
 
 ```
-审查我的 App Store 元数据，给出 ASO 优化建议。
-
-优化 en-US 的关键词 — 我只用了 100 个字符中的 44 个。
-
-给我的 App Store 添加德语（de-DE）、法语（fr-FR）和西班牙语（es-ES）。
-
-我已经设置了 en-US 关键词，添加 en-GB、en-AU、en-CA 并使用不同关键词以最大化覆盖。
+{your_project}/.aso/
+├── context.md              # Stage 2 output (App functions/boundaries)
+├── locale/{LL}.md          # Stage 3 output (per-locale market research)
+├── drafts/{date}.json      # Stage 4 output (keyword draft candidates)
+└── reports/audit_{date}.md # Stage 5 audit run archives
 ```
 
-### 工作流程
+This keeps the skill portable across projects without data pollution.
 
-| # | 工作流 | 说明 |
-|---|--------|------|
-| 1 | **审计** | 拉取所有语言，构建字符计数表，识别 4 类问题 |
-| 2 | **优化** | 跨字段去重，填满关键词预算，按语言制定策略 |
-| 3 | **扩展** | 市场优先级框架，逐语言创建清单 |
-| 4 | **批量操作** | Python 脚本一次添加 10+ 语言 |
-| 5 | **验证** | 优化后完整性检查 |
+## 5-Stage end-to-end workflow
 
-### 本技能帮你避免的常见错误
+```
+Stage 1: Industry knowledge refresh (quarterly, parallel agents)
+   ↓
+Stage 2: App feature analysis (one-time per app, Explore agent scans codebase)
+   ↓
+Stage 3: Multi-locale market research (parallel agents per cluster)
+   ↓
+Stage 4: Keyword drafting (based on Stage 2+3 outputs)
+   ↓
+Stage 5: 3-layer validation + write (mechanical + competitive + functional)
+```
 
-1. 名称/副标题/关键词之间重复用词（Apple 将它们作为整体索引）
-2. 关键词字段半空（浪费一半搜索潜力）
-3. fr-FR 和 fr-CA 使用相同关键词（浪费了第二个关键词池）
-4. 关键词逗号后加空格（`bride, groom` 每个多浪费 1 个字符）
-5. 描述中缺少服务条款和隐私政策链接
-6. API 修改后不验证（可能被静默截断）
+See `references/stage{1..5}_*.md` for each stage's detailed workflow.
 
----
+## Golden rules
 
-## Related Projects / 相关项目
+1. **Name + Subtitle + Keywords share one index pool** — never repeat any word (or root) across fields
+2. **Character budget = money** — fill it: Name ≥15, Subtitle ≥20, Keywords 95-100
+3. **Same-language locales have independent 100-char pools** — en-US/GB/AU/CA must use different words
+4. **Transliteration traps** — `vintage` / `retro` / `romantic` have near-zero search volume in non-English locales
+5. **Screenshot captions are indexed (Apple 2025+)** — caption text becomes search-discoverable keywords
+6. **Category match ≠ function match** — a keyword can land on competitors in your category but in a completely different feature space. Ask: "would users searching this be disappointed by my app?" If yes, skip the keyword.
 
-- **[appstore-connect](https://github.com/AfeiFun/appstore-connect)** — A Claude Code skill for managing App Store Connect via API (metadata, screenshots, versions). Pair with this skill for end-to-end automated ASO workflows.
-- **[appstore-connect](https://github.com/AfeiFun/appstore-connect)** — 通过 API 管理 App Store Connect 的 Claude Code 技能（元数据、截图、版本管理）。与本技能搭配使用，实现端到端自动化 ASO 工作流。
+## Known limitations
+
+- **No popularity data** — Apple Search Ads API (v5) doesn't expose keyword popularity. See `references/asa_api_limitations.md` for the full investigation. AppTweak/Sensor Tower paid APIs are the alternative; we recommend manual ASA backend UI lookup as a free fallback.
+- **Google Trends rate-limited** — `pytrends` is unofficial; expect 429s. Google Suggest endpoint is stable and used as the primary cross-platform signal instead.
+- **CJK substring detection is heuristic** — Apple's CJK index tokenization is a black box; the script flags potential overlaps as WARN, requires human judgment.
+
+## Contributing
+
+Issues and PRs welcome. The toolkit was developed against a real iOS app (couple photo compositor) with 19 locales; some assumptions reflect that — if your app type breaks an assumption (e.g., a single-portrait app on which `headshot` is genuinely on-function), please open an issue and we'll generalize.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgments
+
+- [`rudrankriyam/tap/asc`](https://github.com/rudrankriyam/asc) — App Store Connect CLI
+- [`phiture/searchads_api`](https://github.com/phiture/searchads_api) — ASA v5 endpoint inventory reference
+- Apple Developer Forum [thread/820073](https://developer.apple.com/forums/thread/820073) — ASA custom-reports GET 403 incident reference
