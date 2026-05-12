@@ -15,3 +15,8 @@ pytrends>=4.9
 
 # Note: asc CLI is a separate tool, install via:
 #   brew install rudrankriyam/tap/asc
+streamlit
+pandas
+pytrends
+nltk
+requests
